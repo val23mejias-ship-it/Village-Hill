@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Texas Chainsaw Massacre: Network Outage</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Howler.js para sonidos (CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+</head>
+<body>
+    <!-- Panel de información (ruido, etc.) -->
+    <div id="ui">
+        <div>🔦 Linterna activa</div>
+        <div>🔊 RUIDO: <span id="noise">0</span>%</div>
+        <div id="inventory">📦 Inventario: <span id="inv-items">Ninguno</span></div>
+    </div>
+
+    <!-- Medidor de pánico visual (barra) -->
+    <div id="panic-bar-container">
+        <div id="panic-fill"></div>
+    </div>
+
+    <!-- Panel de decisiones (aparece abajo) -->
+    <div id="decision-panel">
+        <p>🔪 Estás en la cabaña de los Sawyer. La oscuridad te envuelve.<br>
+        Ves una <strong>llave</strong> sobre la mesa y una <strong>motosierra</strong> en el rincón.</p>
+        <div class="buttons">
+            <button id="btnKey">🔑 Tomar la llave (sigiloso)</button>
+            <button id="btnSaw">⛓️ Agarrar la motosierra (ruidoso)</button>
+        </div>
+    </div>
+
+    <!-- El juego 3D se inyecta aquí mediante Three.js -->
+    <div id="game-container"></div>
+
+    <!-- Importar Three.js como módulo -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
