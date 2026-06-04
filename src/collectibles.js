@@ -1,131 +1,93 @@
-// src/collectibles.js — Objetos coleccionables
+// src/collectibles.js — Objetos coleccionables con modelos GLB
 import * as THREE from 'three';
- 
-const PICKUP_DIST = 2.2;
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const loader = new GLTFLoader();
 const INTERACT_DIST = 3.5;
- 
-// Posiciones de los 3 objetos en el mapa
+
+// Definición de los 3 objetos — nombres de archivo y posiciones
 const ITEM_DEFS = [
-  { x:  3.5, z: -14, label: 'Llave oxidada',  color: 0xc8860a },
-  { x: -3.5, z: -32, label: 'Página arrugada', color: 0xe8e0c8 },
-  { x:  2.5, z: -50, label: 'Amuleto roto',    color: 0x6a3a8a },
+  { x:  3.5, z: -14, label: 'Objeto 1', model: 'models/objeto1.glb', color: 0xc8860a, scale: 0.3 },
+  { x: -3.5, z: -32, label: 'Objeto 2', model: 'models/objeto2.glb', color: 0xe8e0c8, scale: 0.3 },
+  { x:  2.5, z: -50, label: 'Objeto 3', model: 'models/objeto3.glb', color: 0x6a3a8a, scale: 0.3 },
 ];
- 
+
 let collectibles = [];
-let nearestIdx = -1;
+let nearestIdx   = -1;
 const hint = document.getElementById('interact-hint');
- 
-// ── Geometrías de cada objeto ────────────────────────────────────
-function buildItemMesh(def) {
+
+// ── Carga un modelo GLB; si falla usa geometría de respaldo ──────
+function loadItemMesh(def) {
+  return new Promise(resolve => {
+    loader.load(
+      def.model,
+      gltf => {
+        const obj = gltf.scene;
+        obj.scale.setScalar(def.scale);
+        obj.traverse(m => { if (m.isMesh) m.castShadow = true; });
+        resolve(obj);
+      },
+      undefined,
+      () => {
+        // Fallback: geometría procedural si no carga el GLB
+        console.warn(`No se cargó ${def.model}, usando fallback.`);
+        resolve(buildFallbackMesh(def));
+      }
+    );
+  });
+}
+
+// Geometría simple de respaldo (por si falta el .glb)
+function buildFallbackMesh(def) {
   const group = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({
-    color: def.color,
-    roughness: 0.4,
-    metalness: 0.6,
-    emissive: def.color,
-    emissiveIntensity: 0.3,
+    color: def.color, roughness: 0.4, metalness: 0.6,
+    emissive: def.color, emissiveIntensity: 0.3,
   });
- 
-  let geo;
-  switch (def.label) {
-    case 'Llave oxidada':
-      // Cuerpo de llave
-      geo = new THREE.TorusGeometry(0.18, 0.05, 8, 16);
-      const ring = new THREE.Mesh(geo, mat);
-      ring.castShadow = true;
-      group.add(ring);
-      const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), mat);
-      shaft.position.y = -0.3;
-      shaft.castShadow = true;
-      group.add(shaft);
-      const tooth1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.06), mat);
-      tooth1.position.set(0.06, -0.42, 0);
-      group.add(tooth1);
-      const tooth2 = tooth1.clone();
-      tooth2.position.y = -0.33;
-      group.add(tooth2);
-      break;
- 
-    case 'Página arrugada':
-      geo = new THREE.PlaneGeometry(0.3, 0.4, 3, 3);
-      // Distorsionar vértices para efecto arrugado
-      const pos = geo.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        pos.setZ(i, (Math.random() - 0.5) * 0.04);
-      }
-      geo.computeVertexNormals();
-      const mat2 = new THREE.MeshStandardMaterial({
-        color: def.color, roughness: 0.95, metalness: 0,
-        emissive: def.color, emissiveIntensity: 0.1,
-        side: THREE.DoubleSide,
-      });
-      const page = new THREE.Mesh(geo, mat2);
-      page.castShadow = true;
-      group.add(page);
-      break;
- 
-    default: // Amuleto roto
-      geo = new THREE.OctahedronGeometry(0.18, 0);
-      const gem = new THREE.Mesh(geo, mat);
-      gem.castShadow = true;
-      group.add(gem);
-      // Cadena (arco de puntos)
-      const chainMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.8 });
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 7) * Math.PI;
-        const chainBead = new THREE.Mesh(new THREE.SphereGeometry(0.025, 5, 5), chainMat);
-        chainBead.position.set(Math.cos(a) * 0.22, Math.sin(a) * 0.22 + 0.1, 0);
-        group.add(chainBead);
-      }
-  }
- 
-  // Luz de relleno
-  const glow = new THREE.PointLight(def.color, 1.5, 3, 2);
-  glow.position.set(0, 0.3, 0);
-  group.add(glow);
- 
+  const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), mat);
+  mesh.castShadow = true;
+  group.add(mesh);
   return group;
 }
- 
-// ── Crear todos los collectibles ─────────────────────────────────
-export function createCollectibles(scene, state, onCollect) {
+
+// ── Crear todos los coleccionables ───────────────────────────────
+export async function createCollectibles(scene, state, onCollect) {
+
+  const meshes = await Promise.all(ITEM_DEFS.map(def => loadItemMesh(def)));
+
   collectibles = ITEM_DEFS.map((def, i) => {
-    const mesh = buildItemMesh(def);
+    const mesh = meshes[i];
+
+    // Luz de brillo
+    const glow = new THREE.PointLight(def.color, 1.5, 3, 2);
+    glow.position.set(0, 0.5, 0);
+    mesh.add(glow);
+
     mesh.position.set(def.x, 0.6, def.z);
     scene.add(mesh);
- 
-    // Plataforma base
+
+    // Plataforma base decorativa
     const baseMat = new THREE.MeshStandardMaterial({
-      color: def.color, emissive: def.color, emissiveIntensity: 0.08,
-      roughness: 1,
+      color: def.color, emissive: def.color, emissiveIntensity: 0.08, roughness: 1,
     });
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.06, 12), baseMat);
     base.position.set(def.x, 0.03, def.z);
     scene.add(base);
- 
-    return {
-      mesh,
-      base,
-      def,
-      index: i,
-      collected: false,
-      t: Math.random() * Math.PI * 2,
-    };
+
+    return { mesh, base, def, index: i, collected: false, t: Math.random() * Math.PI * 2 };
   });
- 
+
   // Tecla E para recoger
   window.addEventListener('keydown', e => {
     if (e.code === 'KeyE' && nearestIdx >= 0) {
       const item = collectibles[nearestIdx];
-      if (!item.collected) {
-        collectItem(item, scene, onCollect);
-      }
+      if (!item.collected) collectItem(item, scene, onCollect);
     }
   });
- 
+
   return collectibles;
 }
- 
+
 function collectItem(item, scene, onCollect) {
   item.collected = true;
   scene.remove(item.mesh);
@@ -133,11 +95,9 @@ function collectItem(item, scene, onCollect) {
   nearestIdx = -1;
   hint.classList.remove('visible');
   onCollect(item.index);
- 
-  // Efecto de recogida — partículas sencillas
   spawnPickupEffect(scene, item.mesh.position.clone(), item.def.color);
 }
- 
+
 function spawnPickupEffect(scene, pos, color) {
   const matP = new THREE.MeshBasicMaterial({ color });
   const particles = [];
@@ -152,7 +112,6 @@ function spawnPickupEffect(scene, pos, color) {
     scene.add(p);
     particles.push({ mesh: p, vel, life: 0.6 });
   }
- 
   let last = performance.now();
   function tick() {
     const now = performance.now();
@@ -174,40 +133,38 @@ function spawnPickupEffect(scene, pos, color) {
   }
   requestAnimationFrame(tick);
 }
- 
+
 // ── Update loop ──────────────────────────────────────────────────
 const _tmp = new THREE.Vector3();
- 
-export function updateCollectibles(items, player, camera) {
+
+export function updateCollectibles(items, player) {
   const pPos = player.body.position;
   nearestIdx = -1;
   let minDist = Infinity;
- 
+
   items.forEach(item => {
     if (item.collected) return;
- 
-    // Animación flotante + rotación
+
+    // Flotar y rotar
     item.t += 0.016;
     item.mesh.position.y = 0.6 + Math.sin(item.t * 1.8) * 0.12;
     item.mesh.rotation.y += 0.02;
- 
+
     // Distancia al jugador
     _tmp.copy(item.mesh.position);
     _tmp.y = pPos.y;
     const dist = pPos.distanceTo(_tmp);
- 
+
     if (dist < INTERACT_DIST && dist < minDist) {
-      minDist = dist;
+      minDist  = dist;
       nearestIdx = item.index;
     }
   });
- 
-  // Mostrar/ocultar hint
-  if (nearestIdx >= 0 && minDist < INTERACT_DIST) {
+
+  if (nearestIdx >= 0) {
     hint.textContent = `[ E ] Recoger — ${collectibles[nearestIdx].def.label}`;
     hint.classList.add('visible');
   } else {
     hint.classList.remove('visible');
   }
 }
- 

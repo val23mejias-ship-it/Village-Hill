@@ -32,29 +32,33 @@ scene.background = new THREE.Color(0x050508);
 scene.fog = new THREE.FogExp2(0x050508, 0.045);
  
 export const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  120
+  75, window.innerWidth / window.innerHeight, 0.1, 120
 );
  
-// ── Resize ──────────────────────────────────────────────────────
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
  
-// ── Inicializar mundo ───────────────────────────────────────────
+// ── Inicializar mundo (async porque carga modelos GLB) ──────────
 const clock = new THREE.Clock();
 let player, collectibles, gate;
  
-function initWorld() {
+async function initWorld() {
   setupLighting(scene);
-  buildMap(scene);
-  gate         = createGate(scene, state);
-  collectibles = createCollectibles(scene, state, onCollect);
-  player       = createPlayer(camera, scene);
+ 
+  // Carga en paralelo mapa y portón
+  await Promise.all([
+    buildMap(scene),
+    createGate(scene).then(g => { gate = g; }),
+  ]);
+ 
+  // Coleccionables también son async
+  collectibles = await createCollectibles(scene, state, onCollect);
+ 
+  // Jugador se crea después del mapa
+  player = createPlayer(camera, scene);
 }
  
 function onCollect(index) {
@@ -76,19 +80,24 @@ function updatePips() {
 // ── Loop principal ──────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
-  if (!state.gameStarted) return;
+  if (!state.gameStarted || !player) return;
  
   const delta = Math.min(clock.getDelta(), 0.05);
   updatePlayer(player, delta);
-  updateCollectibles(collectibles, player, camera);
-  checkGateCross(player.body);
+  if (collectibles) updateCollectibles(collectibles, player);
+  if (gate) checkGateCross(player.body);
   renderer.render(scene, camera);
 }
  
 // ── UI / Start ──────────────────────────────────────────────────
-document.getElementById('btn-start').addEventListener('click', () => {
-  initWorld();
+document.getElementById('btn-start').addEventListener('click', async () => {
+  // Mostrar indicador de carga
+  const btn = document.getElementById('btn-start');
+  btn.textContent = '[ CARGANDO... ]';
+  btn.disabled = true;
+ 
   initAudio();
+  await initWorld();
  
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('hud').style.display = 'block';
@@ -104,7 +113,7 @@ document.getElementById('btn-restart').addEventListener('click', () => {
   location.reload();
 });
  
-// Mostrar pantalla de victoria
+// ── Victoria ─────────────────────────────────────────────────────
 export function showWin() {
   if (state.gameWon) return;
   state.gameWon = true;
@@ -116,7 +125,7 @@ export function showWin() {
   }, 800);
 }
  
-// ── Pointer lock ────────────────────────────────────────────────
+// ── Pointer lock ─────────────────────────────────────────────────
 renderer.domElement.addEventListener('click', () => {
   if (state.gameStarted && !state.gameWon) {
     renderer.domElement.requestPointerLock();
