@@ -142,13 +142,19 @@ export function showWin() {
 
 // ── GAME OVER ────────────────────────────────────────────────────
 function showGameOver() {
-  // Reutilizar la pantalla de victoria con texto diferente
-  const win = document.getElementById('win-screen');
-  win.querySelector('h2').textContent   = 'TE ATRAPÓ';
-  win.querySelector('h2').style.color   = '#ff2200';
-  win.querySelector('p').textContent    = 'No lograste escapar del pueblo';
-  win.classList.remove('hidden');
+  // Ocultar HUD y flee UI antes de mostrar la pantalla
   document.getElementById('hud').style.display = 'none';
+  const fleeUI = document.getElementById('flee-ui');
+  if (fleeUI) fleeUI.style.display = 'none';
+
+  setTimeout(() => {
+    const win = document.getElementById('win-screen');
+    win.querySelector('h2').textContent  = 'TE ATRAPÓ';
+    win.querySelector('h2').style.color  = '#ff2200';
+    win.querySelector('h2').style.textShadow = '0 0 30px #ff220066';
+    win.querySelector('p').textContent   = 'No lograste escapar del pueblo';
+    win.classList.remove('hidden');
+  }, 200);
 }
 
 // ── Pointer lock ─────────────────────────────────────────────────
