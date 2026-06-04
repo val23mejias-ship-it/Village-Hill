@@ -7,9 +7,9 @@ const INTERACT_DIST = 3.5;
 
 // Definición de los 3 objetos — nombres de archivo y posiciones
 const ITEM_DEFS = [
-  { x:  3.5, z: -14, label: 'Objeto 1', model: 'models/objeto1.glb', color: 0xc8860a, scale: 0.3 },
-  { x: -3.5, z: -32, label: 'Objeto 2', model: 'models/objeto2.glb', color: 0xe8e0c8, scale: 0.3 },
-  { x:  2.5, z: -50, label: 'Objeto 3', model: 'models/objeto3.glb', color: 0x6a3a8a, scale: 0.3 },
+  { x:  3.5, z: -14, label: 'Objeto 1', model: 'models/objeto1.glb', color: 0xc8860a, scale: 0.01 },
+  { x: -3.5, z: -32, label: 'Objeto 2', model: 'models/objeto2.glb', color: 0xe8e0c8, scale: 0.01 },
+  { x:  2.5, z: -50, label: 'Objeto 3', model: 'models/objeto3.glb', color: 0x6a3a8a, scale: 0.01 },
 ];
 
 let collectibles = [];

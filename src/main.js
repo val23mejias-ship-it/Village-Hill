@@ -1,20 +1,22 @@
-// src/main.js — Punto de entrada principal
+// src/main.js — Orquestador principal
 import * as THREE from 'three';
 import { createPlayer, updatePlayer } from './player.js';
 import { buildMap } from './map.js';
 import { createCollectibles, updateCollectibles } from './collectibles.js';
 import { createGate, updateGate, checkGateCross } from './gate.js';
-import { setupLighting } from './lighting.js';
-import { initAudio, startAmbience, playPickup, playWinSound } from './audio.js';
- 
+import { setupLighting, createFlashlight } from './lighting.js';
+import { createEnemy, updateEnemy, addNoise } from './enemy.js';
+import { initAudio, startAmbience, playPickup, playWinSound, playGameOver } from './audio.js';
+
 // ── Estado global ───────────────────────────────────────────────
 export const state = {
   collected: 0,
   total: 3,
   gameStarted: false,
   gameWon: false,
+  gameOver: false,
 };
- 
+
 // ── Renderer ────────────────────────────────────────────────────
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -22,100 +24,113 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.4;
+renderer.toneMappingExposure = 0.6; // un poco más brillante
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
- 
+
 // ── Escena & Cámara ─────────────────────────────────────────────
 export const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050508);
-scene.fog = new THREE.FogExp2(0x050508, 0.045);
- 
+scene.background = new THREE.Color(0x080a12);
+scene.fog = new THREE.FogExp2(0x080a12, 0.032); // niebla menos densa
+
 export const camera = new THREE.PerspectiveCamera(
   75, window.innerWidth / window.innerHeight, 0.1, 120
 );
- 
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
- 
-// ── Inicializar mundo (async porque carga modelos GLB) ──────────
+
+// ── Variables de juego ───────────────────────────────────────────
 const clock = new THREE.Clock();
-let player, collectibles, gate;
- 
+let player, collectibles, gate, enemy;
+
+// ── Inicializar mundo ────────────────────────────────────────────
 async function initWorld() {
   setupLighting(scene);
- 
-  // Carga en paralelo mapa y portón
+
   await Promise.all([
     buildMap(scene),
     createGate(scene).then(g => { gate = g; }),
   ]);
- 
-  // Coleccionables también son async
+
   collectibles = await createCollectibles(scene, state, onCollect);
- 
-  // Jugador se crea después del mapa
-  player = createPlayer(camera, scene);
+  player       = createPlayer(camera, scene);
+
+  // Linterna en la cámara
+  createFlashlight(camera);
+
+  // Enemigo
+  enemy = createEnemy(scene, onCaught);
 }
- 
+
 function onCollect(index) {
   state.collected++;
   playPickup();
+  // Recoger objeto genera ruido fuerte
+  addNoise(0.7);
   updatePips();
   if (state.collected >= state.total) {
     setTimeout(() => updateGate(gate, true), 300);
   }
 }
- 
+
+function onCaught() {
+  if (state.gameOver || state.gameWon) return;
+  state.gameOver = true;
+  playGameOver();
+  document.exitPointerLock();
+  showGameOver();
+}
+
 function updatePips() {
   for (let i = 0; i < state.total; i++) {
     const pip = document.getElementById(`pip-${i}`);
     if (pip) pip.classList.toggle('collected', i < state.collected);
   }
 }
- 
-// ── Loop principal ──────────────────────────────────────────────
+
+// ── Loop principal ───────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
   if (!state.gameStarted || !player) return;
- 
+  if (state.gameOver || state.gameWon) return;
+
   const delta = Math.min(clock.getDelta(), 0.05);
+
   updatePlayer(player, delta);
   if (collectibles) updateCollectibles(collectibles, player);
-  if (gate) checkGateCross(player.body);
+  if (gate)         checkGateCross(player.body);
+  if (enemy)        updateEnemy(delta, player.body, camera, onCaught);
+
   renderer.render(scene, camera);
 }
- 
-// ── UI / Start ──────────────────────────────────────────────────
+
+// ── START ────────────────────────────────────────────────────────
 document.getElementById('btn-start').addEventListener('click', async () => {
-  // Mostrar indicador de carga
   const btn = document.getElementById('btn-start');
   btn.textContent = '[ CARGANDO... ]';
   btn.disabled = true;
- 
+
   initAudio();
   await initWorld();
- 
+
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('hud').style.display = 'block';
- 
   renderer.domElement.requestPointerLock();
   state.gameStarted = true;
   clock.start();
   startAmbience();
   animate();
 });
- 
-document.getElementById('btn-restart').addEventListener('click', () => {
-  location.reload();
-});
- 
-// ── Victoria ─────────────────────────────────────────────────────
+
+document.getElementById('btn-restart').addEventListener('click', () => location.reload());
+
+// ── VICTORIA ─────────────────────────────────────────────────────
 export function showWin() {
-  if (state.gameWon) return;
+  if (state.gameWon || state.gameOver) return;
   state.gameWon = true;
   playWinSound();
   document.exitPointerLock();
@@ -124,11 +139,21 @@ export function showWin() {
     document.getElementById('hud').style.display = 'none';
   }, 800);
 }
- 
+
+// ── GAME OVER ────────────────────────────────────────────────────
+function showGameOver() {
+  // Reutilizar la pantalla de victoria con texto diferente
+  const win = document.getElementById('win-screen');
+  win.querySelector('h2').textContent   = 'TE ATRAPÓ';
+  win.querySelector('h2').style.color   = '#ff2200';
+  win.querySelector('p').textContent    = 'No lograste escapar del pueblo';
+  win.classList.remove('hidden');
+  document.getElementById('hud').style.display = 'none';
+}
+
 // ── Pointer lock ─────────────────────────────────────────────────
 renderer.domElement.addEventListener('click', () => {
-  if (state.gameStarted && !state.gameWon) {
+  if (state.gameStarted && !state.gameWon && !state.gameOver) {
     renderer.domElement.requestPointerLock();
   }
 });
- 
