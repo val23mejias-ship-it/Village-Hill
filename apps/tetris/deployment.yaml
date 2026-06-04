@@ -13,6 +13,8 @@ spec:
       labels:
         app: tetris
     spec:
+      imagePullSecrets:
+        - name: gitlab-registry
       containers:
         - name: tetris
           image: registry.gitlab.com/grupo02-paas/paas-infrastructure/tetris:1.0
