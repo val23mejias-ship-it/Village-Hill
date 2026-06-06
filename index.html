@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESCAPE — Juego de Terror</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+    }
+ 
+    canvas { display: block; }
+ 
+    /* ── HUD ── */
+    #hud {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+ 
+    #objects-counter {
+      position: absolute;
+      top: 24px; left: 24px;
+      color: #c8ff00;
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px #c8ff0066;
+    }
+ 
+    #objects-counter .label { color: #666; margin-bottom: 4px; }
+    #objects-counter .items { display: flex; gap: 10px; margin-top: 6px; }
+ 
+    .obj-pip {
+      width: 18px; height: 18px;
+      border: 1px solid #555;
+      border-radius: 2px;
+      transition: all 0.3s ease;
+    }
+    .obj-pip.collected {
+      background: #c8ff00;
+      border-color: #c8ff00;
+      box-shadow: 0 0 8px #c8ff00;
+    }
+ 
+    #crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px; height: 16px;
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(255,255,255,0.6);
+    }
+    #crosshair::before { width: 1px; height: 100%; left: 50%; top: 0; }
+    #crosshair::after  { width: 100%; height: 1px; top: 50%; left: 0; }
+ 
+    #interact-hint {
+      position: absolute;
+      bottom: 120px; left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.3s;
+      text-shadow: 0 0 6px #fff8;
+      background: rgba(0,0,0,0.5);
+      padding: 6px 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    #interact-hint.visible { opacity: 1; }
+ 
+    #controls-hint {
+      position: absolute;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.3);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-align: center;
+      text-transform: uppercase;
+    }
+ 
+    /* ── SCREENS ── */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.8s ease;
+    }
+    .screen.hidden { opacity: 0; pointer-events: none; }
+ 
+    /* START SCREEN */
+    #start-screen {
+      background: #000;
+    }
+ 
+    .title-wrap {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    .title-wrap h1 {
+      font-family: 'Courier New', monospace;
+      font-size: clamp(48px, 10vw, 96px);
+      font-weight: 900;
+      letter-spacing: 0.3em;
+      color: #fff;
+      text-transform: uppercase;
+      line-height: 0.9;
+      position: relative;
+    }
+    .title-wrap h1 .glitch {
+      position: relative;
+      display: inline-block;
+      animation: glitch-main 4s infinite;
+    }
+    .title-wrap h1 .glitch::before,
+    .title-wrap h1 .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+    }
+    .title-wrap h1 .glitch::before {
+      color: #ff003c;
+      animation: glitch-a 4s infinite;
+      clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+    }
+    .title-wrap h1 .glitch::after {
+      color: #00eeff;
+      animation: glitch-b 4s infinite;
+      clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+    }
+ 
+    @keyframes glitch-main {
+      0%, 90%, 100% { transform: none; }
+      92% { transform: skewX(-2deg); }
+      94% { transform: skewX(2deg); }
+    }
+    @keyframes glitch-a {
+      0%, 90%, 100% { transform: none; opacity: 0; }
+      92% { transform: translate(-3px, 0); opacity: 0.8; }
+    }
+    @keyframes glitch-b {
+      0%, 90%, 100% { transform: none; opacity: 0; }
+      94% { transform: translate(3px, 0); opacity: 0.8; }
+    }
+ 
+    .title-wrap .subtitle {
+      font-size: 13px;
+      letter-spacing: 8px;
+      color: #555;
+      text-transform: uppercase;
+      margin-top: 16px;
+    }
+ 
+    .start-info {
+      color: #666;
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 40px;
+      line-height: 2;
+    }
+    .start-info span { color: #c8ff00; }
+ 
+    .btn-start {
+      background: transparent;
+      border: 1px solid #fff;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      padding: 14px 40px;
+      cursor: pointer;
+      transition: all 0.2s;
+      pointer-events: all;
+    }
+    .btn-start:hover {
+      background: #fff;
+      color: #000;
+    }
+ 
+    /* WIN SCREEN */
+    #win-screen {
+      background: rgba(0,0,0,0.92);
+    }
+    #win-screen h2 {
+      font-size: clamp(32px, 6vw, 60px);
+      letter-spacing: 0.4em;
+      color: #c8ff00;
+      text-transform: uppercase;
+      text-shadow: 0 0 30px #c8ff0066;
+      margin-bottom: 16px;
+    }
+    #win-screen p {
+      color: #666;
+      font-size: 13px;
+      letter-spacing: 3px;
+      margin-bottom: 40px;
+    }
+ 
+    /* SCAN LINES overlay */
+    #scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+    }
+ 
+    /* VIGNETTE */
+    #vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%);
+    }
+  </style>
+</head>
+<body>
+ 
+  <!-- Overlay effects -->
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+ 
+  <!-- START SCREEN -->
+  <div id="start-screen" class="screen">
+    <div class="title-wrap">
+      <h1><span class="glitch" data-text="ESCAPE">ESCAPE</span></h1>
+      <div class="subtitle">No hay vuelta atrás</div>
+    </div>
+    <div class="start-info">
+      Encuentra los <span>3 objetos</span> ocultos<br/>
+      y abre el portón antes de que sea demasiado tarde
+    </div>
+    <button class="btn-start" id="btn-start">[ INICIAR ]</button>
+  </div>
+ 
+  <!-- WIN SCREEN -->
+  <div id="win-screen" class="screen hidden">
+    <h2>ESCAPASTE</h2>
+    <p>Lograste salir del pueblo</p>
+    <button class="btn-start" id="btn-restart">[ JUGAR DE NUEVO ]</button>
+  </div>
+ 
+  <!-- HUD -->
+  <div id="hud" style="display:none;">
+    <div id="objects-counter">
+      <div class="label">Objetos</div>
+      <div class="items">
+        <div class="obj-pip" id="pip-0"></div>
+        <div class="obj-pip" id="pip-1"></div>
+        <div class="obj-pip" id="pip-2"></div>
+      </div>
+    </div>
+ 
+    <div id="crosshair"></div>
+    <div id="interact-hint">[ E ] Recoger</div>
+    <div id="controls-hint">WASD · Mover &nbsp;|&nbsp; Ratón · Mirar &nbsp;|&nbsp; E · Recoger</div>
+  </div>
+ 
+  <!-- THREE.JS + MODULES -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="src/main.js"></script>
+ 
+</body>
+</html>
+ 
