@@ -1,6 +1,5 @@
-// src/player.js — Movimiento FPS con linterna y generación de ruido
+// src/player.js — Movimiento FPS con linterna
 import * as THREE from 'three';
-import { addNoise } from './enemy.js';
 
 const SPEED       = 5;
 const SPRINT_MULT = 1.8;
@@ -64,9 +63,6 @@ export function updatePlayer(player, delta) {
     _move.multiplyScalar(speed * delta);
     body.position.addScaledVector(_move, 1);
 
-    // Generar ruido — más si está corriendo
-    addNoise(sprinting ? delta * 1.2 : delta * 0.4);
-
     bobTime += delta * BOB_FREQ;
     _camera.position.y = Math.sin(bobTime) * BOB_AMP;
     _camera.position.x = Math.sin(bobTime * 0.5) * BOB_AMP * 0.5;
@@ -78,9 +74,9 @@ export function updatePlayer(player, delta) {
   _camera.rotation.x = pitch;
   body.position.y    = PLAYER_H;
 
-  // Límites del mapa
-  body.position.x = Math.max(-18, Math.min(18, body.position.x));
-  body.position.z = Math.max(-80, Math.min(30, body.position.z));
+  // Límites del mapa ampliado
+  body.position.x = Math.max(-38, Math.min(38, body.position.x));
+  body.position.z = Math.max(-118, Math.min(30, body.position.z));
 }
 
 export function getPlayerPosition() {
