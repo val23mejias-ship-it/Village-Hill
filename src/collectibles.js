@@ -1,62 +1,69 @@
-// src/collectibles.js — Objetos coleccionables con modelos GLB
+// src/collectibles.js — Objetos coleccionables 100% procedurales
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const loader = new GLTFLoader();
 const INTERACT_DIST = 3.5;
 
-// Definición de los 3 objetos — nombres de archivo y posiciones
 const ITEM_DEFS = [
-  { x:  3.5, z: -14, label: 'Objeto 1', model: 'models/objeto1.glb', color: 0xc8860a, scale: 0.01 },
-  { x: -3.5, z: -32, label: 'Objeto 2', model: 'models/objeto2.glb', color: 0xe8e0c8, scale: 0.01 },
-  { x:  2.5, z: -50, label: 'Objeto 3', model: 'models/objeto3.glb', color: 0x6a3a8a, scale: 0.01 },
+  { x:  3.5, z: -14, label: 'Llave oxidada',    color: 0xc8860a },
+  { x: -3.5, z: -32, label: 'Nota rasgada',     color: 0xe8e0c8 },
+  { x:  2.5, z: -50, label: 'Amuleto maldito',  color: 0x6a3a8a },
 ];
 
 let collectibles = [];
 let nearestIdx   = -1;
 const hint = document.getElementById('interact-hint');
 
-// ── Carga un modelo GLB; si falla usa geometría de respaldo ──────
-function loadItemMesh(def) {
-  return new Promise(resolve => {
-    loader.load(
-      def.model,
-      gltf => {
-        const obj = gltf.scene;
-        obj.scale.setScalar(def.scale);
-        obj.traverse(m => { if (m.isMesh) m.castShadow = true; });
-        resolve(obj);
-      },
-      undefined,
-      () => {
-        // Fallback: geometría procedural si no carga el GLB
-        console.warn(`No se cargó ${def.model}, usando fallback.`);
-        resolve(buildFallbackMesh(def));
-      }
-    );
-  });
-}
-
-// Geometría simple de respaldo (por si falta el .glb)
-function buildFallbackMesh(def) {
+// ── Geometría procedural por tipo ────────────────────────────────
+function buildItemMesh(def, index) {
   const group = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({
-    color: def.color, roughness: 0.4, metalness: 0.6,
-    emissive: def.color, emissiveIntensity: 0.3,
+    color: def.color,
+    roughness: 0.3,
+    metalness: 0.7,
+    emissive: def.color,
+    emissiveIntensity: 0.4,
   });
-  const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), mat);
-  mesh.castShadow = true;
-  group.add(mesh);
+
+  let mesh;
+  if (index === 0) {
+    // Llave — cilindro + esfera
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8), mat);
+    const head = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 8, 16), mat);
+    head.position.y = 0.25;
+    head.rotation.x = Math.PI / 2;
+    body.castShadow = true;
+    head.castShadow = true;
+    group.add(body, head);
+  } else if (index === 1) {
+    // Nota — caja plana
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.4), mat);
+    mesh.castShadow = true;
+    group.add(mesh);
+  } else {
+    // Amuleto — octaedro
+    mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), mat);
+    mesh.castShadow = true;
+    group.add(mesh);
+  }
+
+  // Anillo de brillo en la base
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: def.color, emissive: def.color, emissiveIntensity: 0.6,
+    transparent: true, opacity: 0.5,
+  });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 20), ringMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = -0.3;
+  group.add(ring);
+
   return group;
 }
 
 // ── Crear todos los coleccionables ───────────────────────────────
 export async function createCollectibles(scene, state, onCollect) {
 
-  const meshes = await Promise.all(ITEM_DEFS.map(def => loadItemMesh(def)));
-
   collectibles = ITEM_DEFS.map((def, i) => {
-    const mesh = meshes[i];
+    const mesh = buildItemMesh(def, i);
 
     // Luz de brillo
     const glow = new THREE.PointLight(def.color, 1.5, 3, 2);
@@ -66,7 +73,7 @@ export async function createCollectibles(scene, state, onCollect) {
     mesh.position.set(def.x, 0.6, def.z);
     scene.add(mesh);
 
-    // Plataforma base decorativa
+    // Plataforma base
     const baseMat = new THREE.MeshStandardMaterial({
       color: def.color, emissive: def.color, emissiveIntensity: 0.08, roughness: 1,
     });
@@ -145,18 +152,16 @@ export function updateCollectibles(items, player) {
   items.forEach(item => {
     if (item.collected) return;
 
-    // Flotar y rotar
     item.t += 0.016;
     item.mesh.position.y = 0.6 + Math.sin(item.t * 1.8) * 0.12;
     item.mesh.rotation.y += 0.02;
 
-    // Distancia al jugador
     _tmp.copy(item.mesh.position);
     _tmp.y = pPos.y;
     const dist = pPos.distanceTo(_tmp);
 
     if (dist < INTERACT_DIST && dist < minDist) {
-      minDist  = dist;
+      minDist    = dist;
       nearestIdx = item.index;
     }
   });

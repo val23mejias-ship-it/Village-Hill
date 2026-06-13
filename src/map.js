@@ -1,84 +1,155 @@
-// src/map.js — Mapa ampliado con calles laterales y más casas
+// src/map.js — Mapa completo con geometría procedural (sin modelos GLB)
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const loader = new GLTFLoader();
-let casa1Base, casa2Base, casa3Base, arbol1Base, arbol2Base;
+// ── Materiales globales ──────────────────────────────────────────
+const matGround  = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 1 });
+const matStreet  = new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 0.9 });
+const matFence   = new THREE.MeshStandardMaterial({ color: 0x1c1410, roughness: 1 });
+const matWall1   = new THREE.MeshStandardMaterial({ color: 0x1a1614, roughness: 0.9 });
+const matWall2   = new THREE.MeshStandardMaterial({ color: 0x161214, roughness: 0.9 });
+const matWall3   = new THREE.MeshStandardMaterial({ color: 0x121418, roughness: 0.9 });
+const matRoof1   = new THREE.MeshStandardMaterial({ color: 0x0e0a08, roughness: 1 });
+const matRoof2   = new THREE.MeshStandardMaterial({ color: 0x100c0a, roughness: 1 });
+const matWindow  = new THREE.MeshStandardMaterial({ color: 0xffcc44, emissive: 0xffcc44, emissiveIntensity: 0.4, roughness: 0.3 });
+const matTree    = new THREE.MeshStandardMaterial({ color: 0x0a1a08, roughness: 1 });
+const matTrunk   = new THREE.MeshStandardMaterial({ color: 0x1a100a, roughness: 1 });
+const matRock    = new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.9 });
 
-const matGround = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 1 });
-const matStreet = new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 0.9 });
-const matFence  = new THREE.MeshStandardMaterial({ color: 0x1c1410, roughness: 1 });
+// ── Helpers de sombras ───────────────────────────────────────────
+function shadows(mesh, cast = true, receive = true) {
+  mesh.castShadow = cast;
+  mesh.receiveShadow = receive;
+  return mesh;
+}
 
-function loadModel(path) {
-  return new Promise(resolve => {
-    loader.load(path, gltf => resolve(gltf.scene), undefined, () => {
-      console.warn(`No se cargó: ${path}`); resolve(null);
-    });
+// ── Casa procedural ──────────────────────────────────────────────
+function buildHouse(type = 0) {
+  const g = new THREE.Group();
+
+  const w = type === 0 ? 5 : type === 1 ? 4.5 : 6;
+  const h = type === 0 ? 4 : type === 1 ? 5   : 3.5;
+  const d = type === 0 ? 6 : type === 1 ? 5   : 7;
+
+  const wallMats = [matWall1, matWall2, matWall3];
+  const roofMats = [matRoof1, matRoof2, matRoof1];
+
+  // Cuerpo principal
+  const body = shadows(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMats[type]));
+  body.position.y = h / 2;
+  g.add(body);
+
+  // Techo tipo pirámide / prisma
+  if (type === 1) {
+    // techo puntiagudo
+    const roof = shadows(new THREE.Mesh(new THREE.ConeGeometry(w * 0.78, 2, 4), roofMats[type]));
+    roof.position.y = h + 1;
+    roof.rotation.y = Math.PI / 4;
+    g.add(roof);
+  } else {
+    // techo inclinado (prisma)
+    const roofGeo = new THREE.CylinderGeometry(0, w * 0.7, 2.2, 4, 1);
+    const roof = shadows(new THREE.Mesh(roofGeo, roofMats[type]));
+    roof.position.y = h + 1.1;
+    roof.rotation.y = Math.PI / 4;
+    g.add(roof);
+  }
+
+  // Ventanas con emisión
+  const winGeo = new THREE.PlaneGeometry(0.7, 0.7);
+  const winPositions = [
+    { x: -w / 2 - 0.01, y: h * 0.6, z:  0.8, ry: -Math.PI / 2 },
+    { x: -w / 2 - 0.01, y: h * 0.6, z: -0.8, ry: -Math.PI / 2 },
+    { x:  w / 2 + 0.01, y: h * 0.6, z:  0.8, ry:  Math.PI / 2 },
+    { x:  w / 2 + 0.01, y: h * 0.6, z: -0.8, ry:  Math.PI / 2 },
+  ];
+  winPositions.forEach(({ x, y, z, ry }) => {
+    const win = new THREE.Mesh(winGeo, matWindow);
+    win.position.set(x, y, z);
+    win.rotation.y = ry;
+    g.add(win);
   });
+
+  // Puerta
+  const door = shadows(new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8, 0.1), matFence));
+  door.position.set(0, 0.9, d / 2 + 0.05);
+  g.add(door);
+
+  return g;
 }
 
-export async function loadModels() {
-  [casa1Base, casa2Base, casa3Base, arbol1Base, arbol2Base] = await Promise.all([
-    loadModel('models/casa1.glb'),
-    loadModel('models/casa2.glb'),
-    loadModel('models/casa3.glb'),
-    loadModel('models/arbol1.glb'),
-    loadModel('models/arbol2.glb'),
-  ]);
+// ── Árbol procedural ─────────────────────────────────────────────
+function buildTree(scale = 1) {
+  const g = new THREE.Group();
+
+  const trunkH = 1.5 + Math.random() * 0.5;
+  const trunk  = shadows(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, trunkH, 6), matTrunk));
+  trunk.position.y = trunkH / 2;
+  g.add(trunk);
+
+  // 3 capas de follaje
+  [1.8, 2.6, 3.2].forEach((y, i) => {
+    const r   = 1.2 - i * 0.25;
+    const fol = shadows(new THREE.Mesh(new THREE.ConeGeometry(r, 1.4, 7), matTree));
+    fol.position.y = trunkH + y - 1;
+    g.add(fol);
+  });
+
+  g.scale.setScalar(scale);
+  return g;
 }
 
-function enableShadows(obj) {
-  obj.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-}
-
-function placeModel(base, x, z, rotY = 0, scale = 1) {
-  if (!base) return null;
-  const clone = base.clone();
-  clone.position.set(x, 0, z);
-  clone.rotation.y = rotY;
-  clone.scale.setScalar(scale);
-  enableShadows(clone);
-  return clone;
-}
-
+// ── Poste de luz ─────────────────────────────────────────────────
 function buildLampPost(x, z) {
   const g    = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 5, 6), matFence);
-  pole.position.y = 2.5; pole.castShadow = true; g.add(pole);
-  const arm  = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.06), matFence);
-  arm.position.set(0.4, 5, 0); g.add(arm);
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8),
-    new THREE.MeshStandardMaterial({ emissive: 0xffdd88, emissiveIntensity: 2, color: 0x000000 }));
-  bulb.position.set(0.8, 5, 0); g.add(bulb);
+  const pole = shadows(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 5, 6), matFence));
+  pole.position.y = 2.5;
+  g.add(pole);
+
+  const arm = shadows(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.06), matFence));
+  arm.position.set(0.4, 5, 0);
+  g.add(arm);
+
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 8, 8),
+    new THREE.MeshStandardMaterial({ emissive: 0xffdd88, emissiveIntensity: 2, color: 0x000000 })
+  );
+  bulb.position.set(0.8, 5, 0);
+  g.add(bulb);
+
   const light = new THREE.PointLight(0xffcc66, 2.5, 14, 2);
-  light.position.set(0.8, 4.9, 0); light.castShadow = true;
-  light.shadow.mapSize.set(256, 256); g.add(light);
+  light.position.set(0.8, 4.9, 0);
+  light.castShadow = true;
+  light.shadow.mapSize.set(256, 256);
+  g.add(light);
+
   g.position.set(x, 0, z);
   return g;
 }
 
+// ── Valla ────────────────────────────────────────────────────────
 function buildFenceRow(x1, z1, x2, z2) {
   const g  = new THREE.Group();
   const dx = x2 - x1, dz = z2 - z1;
   const len = Math.sqrt(dx * dx + dz * dz);
   const posts = Math.floor(len / 1.2);
   for (let i = 0; i <= posts; i++) {
-    const t = i / posts;
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), matFence);
+    const t    = i / posts;
+    const post = shadows(new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), matFence));
     post.position.set(x1 + dx * t, 0.55, z1 + dz * t);
-    post.castShadow = true; g.add(post);
+    g.add(post);
   }
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 0.06), matFence);
+  const rail = shadows(new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 0.06), matFence));
   rail.position.set((x1 + x2) / 2, 0.9, (z1 + z2) / 2);
-  rail.rotation.y = Math.atan2(dx, dz); g.add(rail);
+  rail.rotation.y = Math.atan2(dx, dz);
+  g.add(rail);
   return g;
 }
 
+// ── Calle ────────────────────────────────────────────────────────
 function addStreet(scene, cx, cz, w, h) {
-  const s = new THREE.Mesh(new THREE.PlaneGeometry(w, h), matStreet);
+  const s = shadows(new THREE.Mesh(new THREE.PlaneGeometry(w, h), matStreet), false, true);
   s.rotation.x = -Math.PI / 2;
   s.position.set(cx, 0.01, cz);
-  s.receiveShadow = true;
   scene.add(s);
 }
 
@@ -92,135 +163,80 @@ function addDashes(scene, startZ, steps, x = 0) {
   }
 }
 
+// ── Construcción del mapa ────────────────────────────────────────
 export async function buildMap(scene) {
-  await loadModels();
 
-  // ── Suelo ──────────────────────────────────────────────────────
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(350, 350), matGround);
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+  // Suelo
+  const ground = shadows(new THREE.Mesh(new THREE.PlaneGeometry(350, 350), matGround), false, true);
+  ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
 
-  // ── Calles ─────────────────────────────────────────────────────
-  // Calle principal (eje Z)
-  addStreet(scene, 0,  -55, 9, 170);
-  addDashes(scene, 8, 28);
+  // Calles
+  addStreet(scene, 0,   -55, 9, 170);  addDashes(scene, 8, 28);
+  addStreet(scene, -25, -55, 8, 170);  addDashes(scene, 8, 28, -25);
+  addStreet(scene, 25,  -55, 8, 170);  addDashes(scene, 8, 28, 25);
+  [-20, -50, -80, -108].forEach(z => addStreet(scene, 0, z, 62, 8));
 
-  // Calle lateral izquierda
-  addStreet(scene, -25, -55, 8, 170);
-  addDashes(scene, 8, 28, -25);
-
-  // Calle lateral derecha
-  addStreet(scene, 25, -55, 8, 170);
-  addDashes(scene, 8, 28, 25);
-
-  // Cruces horizontales que conectan las 3 calles
-  [-20, -50, -80, -108].forEach(z => {
-    addStreet(scene, 0, z, 62, 8); // conecta izq-centro-der
-  });
-
-  // ── Casas ──────────────────────────────────────────────────────
-  const SCALE   = 1;
-  const bases   = [casa1Base, casa2Base, casa3Base].filter(Boolean);
-  if (!bases.length) return;
-
-  let idx = 0;
-  const house = (x, z, r) => {
-    const m = placeModel(bases[idx++ % bases.length], x, z, r, SCALE);
-    if (m) scene.add(m);
+  // Casas
+  let typeIdx = 0;
+  const house = (x, z, rotY = 0) => {
+    const h = buildHouse(typeIdx++ % 3);
+    h.position.set(x, 0, z);
+    h.rotation.y = rotY;
+    scene.add(h);
   };
 
-  // Calle principal — ambos lados (cada ~12 unidades)
   for (let z = -8; z >= -108; z -= 12) {
     house(-13, z, -Math.PI / 2);
     house( 13, z,  Math.PI / 2);
-  }
-
-  // Calle lateral izquierda — ambos lados
-  for (let z = -8; z >= -108; z -= 12) {
     house(-37, z, -Math.PI / 2);
     house(-15, z,  Math.PI / 2);
-  }
-
-  // Calle lateral derecha — ambos lados
-  for (let z = -8; z >= -108; z -= 12) {
     house( 15, z, -Math.PI / 2);
     house( 37, z,  Math.PI / 2);
   }
-
-  // Casas extra en los fondos de cruce
   [-18, -48, -78, -106].forEach(z => {
-    house(-13, z,  0);
-    house( 13, z,  Math.PI);
-    house(-37, z,  0);
-    house( 37, z,  Math.PI);
+    house(-13, z, 0);         house( 13, z, Math.PI);
+    house(-37, z, 0);         house( 37, z, Math.PI);
   });
 
-  // ── Postes de luz ───────────────────────────────────────────────
+  // Postes de luz
   [-12, -30, -50, -70, -90, -110].forEach(z => {
-    scene.add(buildLampPost(-4, z));
-    scene.add(buildLampPost( 4, z));
-    scene.add(buildLampPost(-21, z));
-    scene.add(buildLampPost(-29, z));
-    scene.add(buildLampPost( 21, z));
-    scene.add(buildLampPost( 29, z));
+    [[-4], [4], [-21], [-29], [21], [29]].forEach(([x]) => scene.add(buildLampPost(x, z)));
   });
 
-  // ── Vallas en calle principal ───────────────────────────────────
+  // Vallas
   scene.add(buildFenceRow(-4,  14, -4,  -125));
   scene.add(buildFenceRow( 4,  14,  4,  -125));
 
-  // ── Árboles ────────────────────────────────────────────────────
-  const TREE_SCALE = 1;
-  const trees = [arbol1Base, arbol2Base].filter(Boolean);
-
-  if (trees.length) {
-    const pos = [];
-    // Perimetro oeste lejano
-    for (let z = 20; z > -130; z -= 3.5) {
-      pos.push({ x: -46 - Math.random() * 8, z });
-      pos.push({ x: -50 - Math.random() * 5, z: z + 1.5 });
-    }
-    // Perimetro este lejano
-    for (let z = 20; z > -130; z -= 3.5) {
-      pos.push({ x: 46 + Math.random() * 8, z });
-      pos.push({ x: 50 + Math.random() * 5, z: z + 1.5 });
-    }
-    // Fondo
-    for (let x = -50; x < 50; x += 3) {
-      pos.push({ x, z: -125 - Math.random() * 5 });
-    }
-    // Frente
-    for (let x = -50; x < -5; x += 3) pos.push({ x, z: 18 + Math.random() * 4 });
-    for (let x =   5; x <  50; x += 3) pos.push({ x, z: 18 + Math.random() * 4 });
-
-    // Entre calles (interior)
-    for (let z = 0; z > -120; z -= 6) {
-      pos.push({ x: -44 + Math.random() * 5, z });
-      pos.push({ x:  44 - Math.random() * 5, z });
-    }
-
-    pos.forEach(({ x, z }, i) => {
-      const m = placeModel(
-        trees[i % trees.length], x, z,
-        Math.random() * Math.PI * 2,
-        TREE_SCALE * (0.8 + Math.random() * 0.5)
-      );
-      if (m) scene.add(m);
-    });
+  // Árboles
+  const treePos = [];
+  for (let z = 20; z > -130; z -= 3.5) {
+    treePos.push({ x: -46 - Math.random() * 8, z });
+    treePos.push({ x: -50 - Math.random() * 5, z: z + 1.5 });
+    treePos.push({ x:  46 + Math.random() * 8, z });
+    treePos.push({ x:  50 + Math.random() * 5, z: z + 1.5 });
   }
+  for (let x = -50; x < 50; x += 3)  treePos.push({ x, z: -125 - Math.random() * 5 });
+  for (let x = -50; x < -5; x += 3)  treePos.push({ x, z: 18 + Math.random() * 4 });
+  for (let x = 5;   x < 50;  x += 3) treePos.push({ x, z: 18 + Math.random() * 4 });
 
-  // ── Rocas ──────────────────────────────────────────────────────
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.9 });
+  treePos.forEach(({ x, z }) => {
+    const t = buildTree(0.8 + Math.random() * 0.5);
+    t.position.set(x, 0, z);
+    t.rotation.y = Math.random() * Math.PI * 2;
+    scene.add(t);
+  });
+
+  // Rocas
   [
     [6,-5],[-5,-18],[7,-33],[-6,-47],[5,-62],[3,-80],[-4,-90],[8,-100],
     [20,-15],[-20,-28],[20,-55],[-20,-70],[20,-95],[-20,-110],
     [-28,-38],[28,-52],[-28,-75],[28,-88],
   ].forEach(([x, z]) => {
-    const r = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(0.3 + Math.random() * 0.4, 0), rockMat);
+    const r = shadows(new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.3 + Math.random() * 0.4, 0), matRock));
     r.position.set(x + (Math.random() - 0.5), 0.2, z + (Math.random() - 0.5));
     r.rotation.set(Math.random(), Math.random(), Math.random());
-    r.castShadow = r.receiveShadow = true;
     scene.add(r);
   });
 }
