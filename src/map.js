@@ -2,18 +2,22 @@
 import * as THREE from 'three';
 
 // ── Materiales globales ──────────────────────────────────────────
-const matGround  = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 1 });
-const matStreet  = new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 0.9 });
-const matFence   = new THREE.MeshStandardMaterial({ color: 0x1c1410, roughness: 1 });
-const matWall1   = new THREE.MeshStandardMaterial({ color: 0x1a1614, roughness: 0.9 });
-const matWall2   = new THREE.MeshStandardMaterial({ color: 0x161214, roughness: 0.9 });
-const matWall3   = new THREE.MeshStandardMaterial({ color: 0x121418, roughness: 0.9 });
-const matRoof1   = new THREE.MeshStandardMaterial({ color: 0x0e0a08, roughness: 1 });
-const matRoof2   = new THREE.MeshStandardMaterial({ color: 0x100c0a, roughness: 1 });
-const matWindow  = new THREE.MeshStandardMaterial({ color: 0xffcc44, emissive: 0xffcc44, emissiveIntensity: 0.4, roughness: 0.3 });
-const matTree    = new THREE.MeshStandardMaterial({ color: 0x0a1a08, roughness: 1 });
-const matTrunk   = new THREE.MeshStandardMaterial({ color: 0x1a100a, roughness: 1 });
-const matRock    = new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.9 });
+const matWall1  = new THREE.MeshLambertMaterial({ color: 0x1a1614 });
+const matWall2  = new THREE.MeshLambertMaterial({ color: 0x161214 });
+const matWall3  = new THREE.MeshLambertMaterial({ color: 0x121418 });
+const matRoof1  = new THREE.MeshLambertMaterial({ color: 0x0e0a08 });
+const matRoof2  = new THREE.MeshLambertMaterial({ color: 0x100c0a });
+const matTree   = new THREE.MeshLambertMaterial({ color: 0x0a1a08 });
+const matTrunk  = new THREE.MeshLambertMaterial({ color: 0x1a100a });
+const matRock   = new THREE.MeshLambertMaterial({ color: 0x1a1a1c });
+const matGround = new THREE.MeshLambertMaterial({ color: 0x0c0c0e });
+const matStreet = new THREE.MeshLambertMaterial({ color: 0x111116 });
+const matFence  = new THREE.MeshLambertMaterial({ color: 0x1c1410 });
+const matWindow = new THREE.MeshLambertMaterial({ 
+  color: 0xffcc44, 
+  emissive: 0xffcc44, 
+  emissiveIntensity: 0.4 
+});
 
 // ── Helpers de sombras ───────────────────────────────────────────
 function shadows(mesh, cast = true, receive = true) {
@@ -118,7 +122,7 @@ function buildLampPost(x, z) {
 
   const light = new THREE.PointLight(0xffcc66, 2.5, 14, 2);
   light.position.set(0.8, 4.9, 0);
-  light.castShadow = true;
+  light.castShadow = false;
   light.shadow.mapSize.set(256, 256);
   g.add(light);
 
@@ -200,8 +204,8 @@ export async function buildMap(scene) {
   });
 
   // Postes de luz
-  [-12, -30, -50, -70, -90, -110].forEach(z => {
-    [[-4], [4], [-21], [-29], [21], [29]].forEach(([x]) => scene.add(buildLampPost(x, z)));
+  [-20, -60, -100].forEach(z => {
+    scene.add(buildLampPost(0, z));
   });
 
   // Vallas
@@ -209,23 +213,21 @@ export async function buildMap(scene) {
   scene.add(buildFenceRow( 4,  14,  4,  -125));
 
   // Árboles
-  const treePos = [];
-  for (let z = 20; z > -130; z -= 3.5) {
-    treePos.push({ x: -46 - Math.random() * 8, z });
-    treePos.push({ x: -50 - Math.random() * 5, z: z + 1.5 });
-    treePos.push({ x:  46 + Math.random() * 8, z });
-    treePos.push({ x:  50 + Math.random() * 5, z: z + 1.5 });
-  }
-  for (let x = -50; x < 50; x += 3)  treePos.push({ x, z: -125 - Math.random() * 5 });
-  for (let x = -50; x < -5; x += 3)  treePos.push({ x, z: 18 + Math.random() * 4 });
-  for (let x = 5;   x < 50;  x += 3) treePos.push({ x, z: 18 + Math.random() * 4 });
+const treePos = [];
+for (let z = 20; z > -130; z -= 8) {
+    treePos.push({ x: -46, z });
+    treePos.push({ x:  46, z });
+}
+for (let x = -46; x < 46; x += 8) {
+    treePos.push({ x, z: -125 });
+}
 
-  treePos.forEach(({ x, z }) => {
+treePos.forEach(({ x, z }) => {
     const t = buildTree(0.8 + Math.random() * 0.5);
     t.position.set(x, 0, z);
     t.rotation.y = Math.random() * Math.PI * 2;
     scene.add(t);
-  });
+});
 
   // Rocas
   [

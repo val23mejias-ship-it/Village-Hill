@@ -28,143 +28,43 @@ const waypoints = [
 // ── Geometría ─────────────────────────────────────────────────────
 function buildEnemyMesh() {
   const group = new THREE.Group();
-
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x020204, roughness: 0.95, metalness: 0.1,
-    transparent: true, opacity: 0.92,
-  });
-  const matSkin = new THREE.MeshStandardMaterial({
-    color: 0x0a0608, roughness: 1, metalness: 0,
-    transparent: true, opacity: 0.88,
-  });
-  const matGlow = new THREE.MeshStandardMaterial({
-    color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 3,
-    transparent: true, opacity: 0.9,
-  });
-  const matVein = new THREE.MeshStandardMaterial({
-    color: 0x1a0005, emissive: 0x3a0008, emissiveIntensity: 0.5,
-    transparent: true, opacity: 0.7,
+  const mat = new THREE.MeshLambertMaterial({ color: 0x020204 });
+  const matGlow = new THREE.MeshLambertMaterial({ 
+    color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2 
   });
 
-  // Torso elongado
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 2.2, 6, 10), mat);
-  torso.name = 'torso';
-  torso.position.y = 1.8;
-  torso.scale.set(1, 1, 0.5);
-  group.add(torso);
+  // Cuerpo
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.25), mat);
+  body.position.y = 1.4;
+  group.add(body);
 
-  // Cuello torcido
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 0.7, 6), matSkin);
-  neck.position.set(0.08, 3.1, 0);
-  neck.rotation.z = 0.2;
-  group.add(neck);
-
-  // Cabeza pequeña alargada
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 7, 6), matSkin);
-  head.name = 'head';
-  head.scale.set(0.7, 1.3, 0.6);
-  head.position.set(0.1, 3.65, 0);
+  // Cabeza
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.25), mat);
+  head.position.y = 2.2;
   group.add(head);
 
-  // Deformaciones
-  const bump1 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 4), matSkin);
-  bump1.position.set(-0.15, 3.85, 0.05);
-  bump1.scale.set(1, 0.6, 0.8);
-  group.add(bump1);
-  const bump2 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 5, 4), matSkin);
-  bump2.position.set(0.18, 3.55, -0.1);
-  group.add(bump2);
-
-  // 4 ojos asimétricos
-  [[-0.1, 3.72, 0.22], [0.08, 3.68, 0.24], [-0.18, 3.62, 0.18], [0.2, 3.78, 0.2]].forEach(([x,y,z]) => {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 5), matGlow);
-    eye.position.set(x, y, z);
+  // Ojos
+  [-0.07, 0.07].forEach(x => {
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.05), matGlow);
+    eye.position.set(x, 2.22, 0.13);
     group.add(eye);
   });
 
-  // Boca hendidura
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.05),
-    new THREE.MeshStandardMaterial({ color: 0x000000 }));
-  mouth.position.set(0.05, 3.48, 0.24);
-  mouth.rotation.z = 0.15;
-  group.add(mouth);
-
-  // Brazo izquierdo largo
-  const leftArm = new THREE.Group();
-  leftArm.name = 'leftArm';
-  const lUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 1.0, 3, 6), matSkin);
-  lUpper.position.y = -0.5; leftArm.add(lUpper);
-  const lElbow = new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4), matSkin);
-  lElbow.position.set(0, -1.05, 0); leftArm.add(lElbow);
-  const lFore = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 1.1, 3, 6), matSkin);
-  lFore.position.set(0.05, -1.7, 0.1); lFore.rotation.z = -0.15; leftArm.add(lFore);
-  for (let f = 0; f < 4; f++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.022, 0.55 + f * 0.05, 2, 4), matSkin);
-    finger.position.set(-0.08 + f * 0.06, -2.35 - f * 0.02, 0.1 + f * 0.03);
-    finger.rotation.x = 0.3 + f * 0.1; finger.rotation.z = -0.1 + f * 0.05;
-    leftArm.add(finger);
-  }
-  leftArm.position.set(-0.28, 2.9, 0);
-  leftArm.rotation.z = 0.5; leftArm.rotation.x = 0.4;
-  group.add(leftArm);
-
-  // Brazo derecho
-  const rightArm = new THREE.Group();
-  rightArm.name = 'rightArm';
-  const rUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.85, 3, 6), matSkin);
-  rUpper.position.y = -0.42; rightArm.add(rUpper);
-  const rElbow = new THREE.Mesh(new THREE.SphereGeometry(0.075, 5, 4), matSkin);
-  rElbow.position.set(-0.05, -0.9, 0.05); rightArm.add(rElbow);
-  const rFore = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.9, 3, 6), matSkin);
-  rFore.position.set(-0.08, -1.48, 0.15); rFore.rotation.z = 0.2; rightArm.add(rFore);
-  for (let f = 0; f < 4; f++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.024, 0.45 + f * 0.04, 2, 4), matSkin);
-    finger.position.set(0.06 - f * 0.055, -1.98 - f * 0.02, 0.12);
-    finger.rotation.x = 0.4; finger.rotation.z = 0.1 - f * 0.06;
-    rightArm.add(finger);
-  }
-  rightArm.position.set(0.28, 2.85, 0);
-  rightArm.rotation.z = -0.35; rightArm.rotation.x = 0.6;
-  group.add(rightArm);
-
-  // Venas en torso
-  for (let v = 0; v < 5; v++) {
-    const vein = new THREE.Mesh(new THREE.CapsuleGeometry(0.012, 0.4 + Math.random() * 0.4, 2, 4), matVein);
-    vein.position.set((Math.random() - 0.5) * 0.3, 1.2 + Math.random() * 1.4, 0.18);
-    vein.rotation.z = (Math.random() - 0.5) * 1.2;
-    group.add(vein);
-  }
-
-  // Piernas largas
-  [-0.15, 0.15].forEach((dx, i) => {
-    const lg = new THREE.Group();
-    lg.name = i === 0 ? 'leftLeg' : 'rightLeg';
-    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.85, 3, 6), matSkin);
-    thigh.position.y = -0.42; lg.add(thigh);
-    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.09, 5, 4), matSkin);
-    knee.position.set(0, -0.9, 0.06); lg.add(knee);
-    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.9, 3, 6), matSkin);
-    shin.position.set(0.02, -1.5, 0.05); shin.rotation.x = -0.1; lg.add(shin);
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.25), matSkin);
-    foot.position.set(0, -1.98, 0.1); lg.add(foot);
-    lg.position.set(dx, 0.85, 0);
-    group.add(lg);
+  // Piernas
+  [-0.12, 0.12].forEach((x, i) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.8, 0.2), mat);
+    leg.name = i === 0 ? 'leftLeg' : 'rightLeg';
+    leg.position.set(x, 0.4, 0);
+    group.add(leg);
   });
 
-  // Aura oscura
-  const aura = new THREE.Mesh(new THREE.CircleGeometry(0.9, 14),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
-  aura.rotation.x = -Math.PI / 2; aura.position.y = 0.01;
-  group.add(aura);
-
-  // Partículas flotantes
-  for (let p = 0; p < 6; p++) {
-    const particle = new THREE.Mesh(new THREE.SphereGeometry(0.04 + Math.random() * 0.05, 4, 4),
-      new THREE.MeshBasicMaterial({ color: 0x110005, transparent: true, opacity: 0.6 }));
-    particle.name = `particle_${p}`;
-    particle.position.set((Math.random() - 0.5) * 0.8, 0.1 + Math.random() * 1.5, (Math.random() - 0.5) * 0.8);
-    group.add(particle);
-  }
+  // Brazos
+  [-0.35, 0.35].forEach((x, i) => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 0.15), mat);
+    arm.name = i === 0 ? 'leftArm' : 'rightArm';
+    arm.position.set(x, 1.4, 0);
+    group.add(arm);
+  });
 
   return group;
 }

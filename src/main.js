@@ -15,11 +15,11 @@ export const state = {
 
 // ── Renderer ─────────────────────────────────────────────────────
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
-renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = THREE.NoToneMapping;
 renderer.toneMappingExposure = 0.6;
 renderer.outputColorSpace  = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);

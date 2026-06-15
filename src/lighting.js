@@ -10,7 +10,7 @@ export function setupLighting(scene) {
   // ── Luna más brillante ───────────────────────────────────────
   const moon = new THREE.DirectionalLight(0x6688cc, 1.2);
   moon.position.set(20, 40, 10);
-  moon.castShadow = true;
+  moon.castShadow = false;
   moon.shadow.mapSize.set(2048, 2048);
   moon.shadow.camera.near   = 1;
   moon.shadow.camera.far    = 150;
@@ -30,17 +30,7 @@ export function setupLighting(scene) {
   gateLight.position.set(0, 4, -68);
   scene.add(gateLight);
 
-  // ── Luces de ventanas ────────────────────────────────────────
-  [
-    { x: -8, z:   5 },
-    { x:  8, z:  -8 },
-    { x: -8, z: -36 },
-    { x:  8, z: -22 },
-  ].forEach(({ x, z }) => {
-    const light = new THREE.PointLight(0x2a3a1a, 2, 10, 2);
-    light.position.set(x, 2.5, z);
-    scene.add(light);
-  });
+
 
   // ── Postes de luz más brillantes ────────────────────────────
   // (los postes ya tienen su propia PointLight en map.js,
@@ -48,30 +38,6 @@ export function setupLighting(scene) {
   const streetGlow = new THREE.PointLight(0xffcc66, 0.6, 40, 1);
   streetGlow.position.set(0, 5, -25);
   scene.add(streetGlow);
-
-  // ── Parpadeo de luces ────────────────────────────────────────
-  const flickerLights = [];
-  [-15, -45].forEach(z => {
-    const fl = new THREE.PointLight(0xffcc44, 2.5, 12, 2);
-    fl.position.set(-4, 4.8, z);
-    scene.add(fl);
-    flickerLights.push({ light: fl, baseIntensity: 2.5, t: Math.random() * 100 });
-  });
-
-  let lastTime = performance.now();
-  function flickerUpdate() {
-    const now = performance.now();
-    const dt  = (now - lastTime) / 1000;
-    lastTime  = now;
-    flickerLights.forEach(fl => {
-      fl.t += dt;
-      const noise = Math.sin(fl.t * 17.3) * Math.sin(fl.t * 5.7) * Math.sin(fl.t * 23.1);
-      fl.light.intensity = fl.baseIntensity + noise * 0.5;
-      if (Math.random() < 0.002) fl.light.intensity = 0;
-    });
-    requestAnimationFrame(flickerUpdate);
-  }
-  flickerUpdate();
 }
 
 // ── Linterna del jugador ─────────────────────────────────────────
